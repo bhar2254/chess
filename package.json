@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "remote": "wrangler dev --env dev --remote",
+    "build": "wrangler publish",
+    "start": "wrangler dev --remote --env dev"
+  },
+  "dependencies": {
+    "chess.js": "^1.0.0",
+    "chessboardjs": "^0.0.1",
+    "dotenv": "^16.4.7",
+    "hono": "^4.6.13"
+  }
+}
