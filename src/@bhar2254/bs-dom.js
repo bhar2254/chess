@@ -618,6 +618,30 @@ export class Page extends Defaults {
     set body(content) {
         const body = `
     <body>
+        <div class="modal" id="gameOverModal" tabindex="-1" aria-labelledby="exampleModalCenterTitle" style="display: none;" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm bg-glass-dark-3">
+                <div class="modal-content bg-glass-dark-5">
+                <div class="modal-header text-white" id="gameOverHeader">
+                    <h5 class="modal-title" id="gameOverModalLabel">Game Over</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    <p><span id="gameOverMessage"></span></p>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <div class="btn-group mx-auto" id="gameOverButtons">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" aria-label="Close" onclick="setTimeout(resetBoard, 750)">Restart Game</button>
+                        <button id="copyButton" type="button" class="btn btn-secondary">Copy FEN to Clipboard</button>
+                        <button type="button" class="btn btn-secondary" onclick="reviewGame()">Review Game</button>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
         <iframe name="hiddenFrame" style="display:none;" class="hide"></iframe>
         <div class='main'>
             <div class='mx-auto my-5 bg-glass-dark bg-glass-dark-5 shadow-lg bh-left-bar-secondary col-lg-9 col-md-12 col-sm-12'>

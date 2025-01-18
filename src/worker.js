@@ -5,7 +5,9 @@
 
 //  Import modules
 import { Hono } from 'hono';
+import { rawHtmlResponse } from './@bhar2254/std'
 import { Page } from './@bhar2254/bs-dom'
+import { playableBoard } from './@bhar2254/chess-bot';
 import index from './routes/index';
 
 const version = '0.0.0'
@@ -24,7 +26,10 @@ const BASE_NAV =  [{
 	links: [{
 		text: 'Terminology',
 		link: `/intro`
-	}],
+	}, {
+		text: 'FEN',
+		link: '/position',
+	},],
 }, {
 	text: 'Guides',
 	links: [{
@@ -38,11 +43,25 @@ const BASE_NAV =  [{
 		link: '/endings'
 	}],
 }, {
-	text: 'FEN',
-	link: '/position',
+	text: 'Puzzles',
+	link: '/puzzles',
 }, {
 	text: 'Play!',
-	link: '/play',
+	links: [{
+		text: 'Standard',
+		link: '/play',
+	},{
+		text: 'Against Computer',
+		link: '/play/bot',
+	},{
+		text: 'Against Blaine',
+		link: '/play/random',
+	},{
+		text: 'hr',
+	},{
+		text: 'Chess960',
+		link: '/play/fischer',
+	},]
 }]
 
 var ENV = {
@@ -67,11 +86,13 @@ const _headerDef = `
 	<link rel='stylesheet' href='https://bhar2254.github.io/src/css/f1/popup.css'>
 	<link rel='stylesheet' href='https://bhar2254.github.io/src/css/bs.add.css'>
 	<link rel='stylesheet' href='https://bhar2254.github.io/src/css/bs.add.blue.css'>
+	<!---<link rel='stylesheet' href='https://bhar2254.github.io/src/css/chessboard-arrows.css'>!--->
 
 	<script src='https://kit.fontawesome.com/5496aaa581.js' crossorigin='anonymous'><\/script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.js"></script>
+	<!---<script src="https://bhar2254.github.io/src/js/chessboard-arrows.js"></script>!--->
 
 	<style>
 		body {
@@ -173,5 +194,24 @@ app.use( async (c, next) => {
 })
 
 app.route('/', index);
+
+//	route handler
+app.get('/404', c => {
+	const body = `<div class="py-5 container">
+		<h2 class="text-center">Page not found!</h2>
+		<hr>
+		<p class="text-center">If you're not sure how you found yourself here, head back <a href="/">home</a>.</p>
+		<p class="text-center text-muted">If you think this is a mistake, reach out to the <a href="mailto:devs@blaineharper.com">developers</a>.</p>
+		<hr>
+		<div class="g-4 row">
+			<div class="mx-auto col-lg-6 col-md-11">
+				<div id="playableBoard" style="touch-action:none;" class="m-0 p-0"></div>
+			</div>
+		</div>
+	</div>
+	${playableBoard({start: '8/8/3k4/4K3/8/8/8/8 w - - 0 1',autoplay: true, strat: 'always_take'})}`
+	const page = new Page({pageTitle: 'Home',body: body})
+	return rawHtmlResponse(page.render())
+})
 
 export default app;

@@ -4441,7 +4441,7 @@ router.get("/", (c) => {
             board = Chessboard('myBoard', config)
         <\/script>`;
   const page = new Page({
-    page_title: "Home",
+    pageTitle: "Home",
     body: body || `<div class='p-3 text-center'><h2>Hello World!</h2<</div><br>
 				<img class='p-3 mx-auto d-block rounded' src='https://blaineharper.com/assets/favicon.ico' style='max-width:100%; max-height: 25rem'>`
   });

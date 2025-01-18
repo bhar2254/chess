@@ -2,109 +2,20 @@
 
 import { rawHtmlResponse } from '../@bhar2254/std'
 import { Page } from '../@bhar2254/bs-dom'
+import { playableBoard, playableBoardWithOverlay } from '../@bhar2254/chess-bot'
 import { Hono } from 'hono';
+import puzzles from './puzzles';
 import openings from './openings';
-import { Chess } from 'chess.js'
-import { Chessboard } from 'chessboardjs'
 
 const router = new Hono();
 
 router.route('/openings', openings);
+router.route('/puzzles', puzzles);
 
 router.get('/img/chesspieces/wikipedia/:filename', async (c) => {
     const filename = c.req.param('filename');
     return c.env.ASSETS.fetch(`https://bhar2254.github.io/src/img/chesspieces/wikipedia/${filename}`);
 });
-
-const playableBoard = (start) => {
-    return `
-      
-      <script>
-            var board = null
-            var game = new Chess()
-            var whiteSquareGrey = '#a9a9a9'
-            var blackSquareGrey = '#696969'
-
-            function removeGreySquares () {
-                $('#playableBoard .square-55d63').css('background', '')
-            }
-
-            function greySquare (square) {
-                var $square = $('#playableBoard .square-' + square)
-
-                var background = whiteSquareGrey
-                if ($square.hasClass('black-3c85d')) {
-                    background = blackSquareGrey
-                }
-
-                $square.css('background', background)
-            }
-
-            function onDragStart (source, piece) {
-                // do not pick up pieces if the game is over
-                if (game.game_over()) return false
-
-                // or if it's not that side's turn
-                if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
-                    (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
-                    return false
-                }
-            }
-
-            function onDrop (source, target) {
-                removeGreySquares()
-
-                // see if the move is legal
-                var move = game.move({
-                    from: source,
-                    to: target,
-                    promotion: 'q' // NOTE: always promote to a queen for example simplicity
-                })
-
-                // illegal move
-                if (move === null) return 'snapback'
-            }
-
-            function onMouseoverSquare (square, piece) {
-                // get list of possible moves for this square
-                var moves = game.moves({
-                    square: square,
-                    verbose: true
-                })
-
-                // exit if there are no moves available for this square
-                if (moves.length === 0) return
-
-                // highlight the square they moused over
-                greySquare(square)
-
-                // highlight the possible squares for this piece
-                for (var i = 0; i < moves.length; i++) {
-                    greySquare(moves[i].to)
-                }
-            }
-
-            function onMouseoutSquare (square, piece) {
-                removeGreySquares()
-            }
-
-            function onSnapEnd () {
-                board.position(game.fen())
-            }
-
-            var config = {
-                draggable: true,
-                position: '${start}',
-                onDragStart: onDragStart,
-                onDrop: onDrop,
-                onMouseoutSquare: onMouseoutSquare,
-                onMouseoverSquare: onMouseoverSquare,
-                onSnapEnd: onSnapEnd,
-                pieceTheme: 'https://bhar2254.github.io/src/img/chesspieces/chess.com/cat/{piece}.png'
-            }
-            board = Chessboard('playableBoard', config)
-      </script>`
-}
 
 //	route handler
 router.get('/', c => {
@@ -119,7 +30,7 @@ router.get('/', c => {
             </div>
         </div>
     </div>
-      ${playableBoard('start')}
+    ${playableBoard({autoplay: true, strat: 'always_take'})}
       <script>
         var moves = ["c4", "d5"];
         var i = 0;
@@ -129,19 +40,16 @@ router.get('/', c => {
             game.move(moves[i]);
             board.position(game.fen());
             i++;
-            setTimeout(makeMove, 1000);
+            movePlaSound.play();
+            setTimeout(makeMove, 750);
           }
         }
 
         $(document).ready(function() {
-            setTimeout(makeMove, 1000);
+            setTimeout(makeMove, 750);
         });
       </script>`
-    const page = new Page({
-        page_title: 'Home',
-        body: body || `<div class='p-3 text-center'><h2>Hello World!</h2<</div><br>
-				<img class='p-3 mx-auto d-block rounded' src='https://blaineharper.com/assets/favicon.ico' style='max-width:100%; max-height: 25rem'>`
-    })
+    const page = new Page({pageTitle: 'Home',body: body})
     return rawHtmlResponse(page.render())
 })
 
@@ -224,16 +132,31 @@ router.get('/intro', (c) => {
             </div>
         </section>
         </div>`
-    const page = new Page({page_title: 'Home', body})
+    const page = new Page({pageTitle: 'Home', body})
     return rawHtmlResponse(page.render())
 });
 
-router.get('/play', (c) => {
-    const { fen = 'start' } = c.req.queries()
-    console.log(fen)
+router.get('/play/debug', (c) => {
+    const { fen = null, autoplay = false } = c.req.queries()
     const body = `<div class="py-5 container">
-        <h2 class="text-center">Play!</h2>
-        <p class="text-center">Find a friend and play a game of chess! Or test your skills against yourself</p>
+        <h2 class="text-center">Developers Only!!</h2>
+        <p class="text-center">This page is for developing the app further!</p>
+        <hr>
+        <div class="g-4 row">
+            <div class="m-3 p-3 mx-auto col-lg-5 col-md-11 bg-glass-dark-3">
+                <span id="moveSpan"></span><br>
+                <span id="feedbackSpan"></span>
+            </div>
+        </div>
+        <div class="row">
+            <div class="mx-auto text-center col-lg-3 col-sm-11">
+                <div class="btn-group" id="boardControlButtons">
+                    <button type="button" class="btn btn-secondary" onclick="undoMove();"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="btn btn-primary" onclick="setTimeout(resetBoard, 750)">Reset Board</button>
+                    <button type="button" class="btn btn-secondary" onclick="redoMove();"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
         <hr>
         <div class="g-4 row">
             <div class="mx-auto col-lg-6 col-md-11">
@@ -241,36 +164,170 @@ router.get('/play', (c) => {
             </div>
         </div>
     </div>
-      ${playableBoard('start')}`
-    const page = new Page({
-        page_title: 'Home',
-        body: body || `<div class='p-3 text-center'><h2>Hello World!</h2<</div><br>
-                <img class='p-3 mx-auto d-block rounded' src='https://blaineharper.com/assets/favicon.ico' style='max-width:100%; max-height: 25rem'>`
-    })
+    ${playableBoard({start: fen, autoplay, strat: 'always_take'})}`
+    const page = new Page({pageTitle: 'Home',body: body})
+    return rawHtmlResponse(page.render())
+});
+
+router.get('/play/standard', (c) => {
+    const { fen = null } = c.req.queries()
+    const body = `<div class="py-5 container">
+        <h2 class="text-center">Play!</h2>
+        <p class="text-center">Find a friend and play a game of chess! Or test your skills against yourself</p>
+        <hr>
+        <div class="row">
+            <div class="mx-auto text-center col-lg-3 col-sm-11">
+                <div class="btn-group" id="boardControlButtons">
+                    <button type="button" class="btn btn-secondary" onclick="undoMove();"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="btn btn-primary" onclick="setTimeout(resetBoard, 750)">Reset Board</button>
+                    <button type="button" class="btn btn-secondary" onclick="redoMove();"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="g-4 row">
+            <div class="mx-auto col-lg-6 col-md-11">
+                <div id="playableBoard" style="touch-action:none;" class="m-0 p-0"></div>
+            </div>
+        </div>
+    </div>
+    ${playableBoard({start: fen})}`
+    const page = new Page({pageTitle: 'Home',body: body})
+    return rawHtmlResponse(page.render())
+});
+
+router.get('/play/bot', (c) => {
+    const { fen = null } = c.req.queries()
+    const body = `<div class="py-5 container">
+        <h2 class="text-center">Play against the the computer</h2>
+        <p class="text-center">In this game, the computer will play against you!</p>
+        <hr>
+        <div class="row">
+            <div class="mx-auto text-center col-lg-3 col-sm-11">
+                <div class="btn-group" id="boardControlButtons">
+                    <button type="button" class="btn btn-secondary" onclick="undoMove();"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="btn btn-primary" onclick="setTimeout(resetBoard, 750)">Reset Board</button>
+                    <button type="button" class="btn btn-secondary" onclick="redoMove();redoMove();"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="g-4 row">
+            <div class="mx-auto col-lg-6 col-md-11">
+                <div id="playableBoard" style="touch-action:none;" class="m-0 p-0"></div>
+            </div>
+        </div>
+    </div>
+    ${playableBoard({start: fen, autoplay: true, strat: 'always_take'})}`
+    const page = new Page({pageTitle: 'Home',body: body})
+    return rawHtmlResponse(page.render())
+});
+
+router.get('/play/random', (c) => {
+    const { fen = null } = c.req.queries()
+    const body = `<div class="py-5 container">
+        <h2 class="text-center">Play against random moves!</h2>
+        <p class="text-center">Play a game against a bot that has no idea what chess is. Okay, it's me. Play a game against me.</p>
+        <hr>
+        <div class="row">
+            <div class="mx-auto text-center col-lg-3 col-sm-11">
+                <div class="btn-group" id="boardControlButtons">
+                    <button type="button" class="btn btn-secondary" onclick="undoMove();"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="btn btn-primary" onclick="setTimeout(resetBoard, 750)">Reset Board</button>
+                    <button type="button" class="btn btn-secondary" onclick="redoMove();"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="g-4 row">
+            <div class="mx-auto col-lg-6 col-md-11">
+                <div id="playableBoard" style="touch-action:none;" class="m-0 p-0"></div>
+            </div>
+        </div>
+    </div>
+    ${playableBoard({start: fen, autoplay: true})}`
+    const page = new Page({pageTitle: 'Home',body: body})
+    return rawHtmlResponse(page.render())
+});
+
+router.get('/play', (c) => {
+    return c.redirect('/play/standard');
+});
+
+function shuffleArray(array) {
+    return array.sort(() => Math.random() - 0.5);
+}
+
+const generateFischerFen = () => {
+    const pieces = 'rnbqkbnr'
+    const array = shuffleArray(pieces.split(''))
+    const fischerString = array.join('')
+    const fen = `${fischerString}/pppppppp/8/8/8/8/PPPPPPPP/${fischerString.toUpperCase()} w KQkq - 0 1`
+    return fen
+}
+
+router.get('/play/fischer', (c) => {
+    const { fen = generateFischerFen() } = c.req.queries()
+    const body = `<div class="py-5 container">
+        <h2 class="text-center">Play Fischer Random!</h2>
+        <p class="text-center">Chess960, also known as Fischer Random Chess, is a chess variant that randomizes the starting position of the pieces on the back rank. It was introduced by former world chess champion Bobby Fischer in 1996 to reduce the emphasis on opening preparation and to encourage creativity in play. Chess960 uses the same board and pieces as classical chess, but the starting position of the pieces on the players' home ranks is randomized, following certain rules. The random setup makes gaining an advantage through the memorization of openings unfeasible. Players instead must rely on their skill and creativity.</p>
+        <hr>
+        <div class="row">
+            <div class="mx-auto text-center col-lg-3 col-sm-11">
+                <div class="btn-group" id="boardControlButtons">
+                    <button type="button" class="btn btn-secondary" onclick="undoMove();"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" class="btn btn-primary" onclick="setTimeout(resetBoard, 750)">Reset Board</button>
+                    <button type="button" class="btn btn-secondary" onclick="redoMove();redoMove();"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="g-4 row">
+            <div class="mx-auto col-lg-6 col-md-11">
+                <div id="playableBoard" style="touch-action:none;" class="m-0 p-0"></div>
+            </div>
+        </div>
+    </div>
+    ${playableBoard({type: 'fischer', start: fen, autoplay: true, strat: 'always_take'})}`
+    const page = new Page({pageTitle: 'Home',body: body})
     return rawHtmlResponse(page.render())
 });
 
 router.get('/position', (c) => {
-    const { fen = 'start' } = c.req.queries()
-    console.log(fen)
+    const queens_gambit = ["rnbqkbnr/ppp1pppp/8/3p4/2P5/8/PP1PPPPP/RNBQKBNR w KQkq - 0 2"]
+    const { fen = queens_gambit } = c.req.queries()
+    function describeFEN(fen) {
+        const [position, turn, castling, enPassant, halfmove, fullmove] = fen.split(" ");
+    
+        const descriptions = [
+            `<p>The board position is represented in FEN notation as:</p><pre class="p-3 bg-glass-dark-5 border">${position}</pre>`,
+            `<p>It is <strong>${turn === "w" ? "White" : "Black"}</strong> to move.</p>`,
+            `<p>Castling rights are: <strong>${castling !== "-" ? castling : "None"}</strong>.</p>`,
+            `<p>En passant target square: <strong>${enPassant !== "-" ? enPassant : "None"}</strong>.</p>`,
+            `<p>Halfmove clock (moves since last pawn move or capture): <strong>${halfmove}</strong>.</p>`,
+            `<p>Fullmove number (total moves in the game): <strong>${fullmove}</strong>.</p>`
+        ];
+    
+        return `<ul><li>${descriptions.join("</li><li>")}</li></ul>`;
+    }
+    
+    // Example usage
+    console.log(fen[0])
+    const fenData = describeFEN(fen[0])
     const body = `<div class="py-5 container">
         <h2 class="text-center">Forsyth-Edwards Notation (FEN)</h2>
         <p class="text-center">FEN is a standard notation used to describe chess positions for analysis and recording.</p>
         <hr>
+        ${fen === queens_gambit ? `
         <h5 class="card-title">Queen’s Gambit FEN Explained</h5>
         <p>The Queen’s Gambit opening starts with:</p>
-        <pre class="bg-glass-dark-5 p-2 border">1. d4 d5 2. c4</pre>
+        <pre class="bg-glass-dark-5 p-2 border">1. d4 d5 2. c4</pre>`: ``}
         <p>This results in the following FEN string:</p>
         <pre class="bg-glass-dark-5 p-2 border">rnbqkbnr/ppp1pppp/8/3p4/2P5/8/PP1PPPPP/RNBQKBNR w KQkq - 0 2</pre>
         
         <h6>Breaking it down:</h6>
         <ul>
-            <li><strong>rnbqkbnr/ppp1pppp/8/3p4/2P5/8/PP1PPPPP/RNBQKBNR</strong> - Board position.</li>
-            <li><strong>w</strong> - White to move.</li>
-            <li><strong>KQkq</strong> - Both sides still have castling rights.</li>
-            <li><strong>-</strong> - No en passant target square.</li>
-            <li><strong>0</strong> - No halfmoves since the last capture or pawn move.</li>
-            <li><strong>2</strong> - It’s White’s second move.</li>
+            ${fenData}
         </ul>
         <script>
             function generateFEN() {
@@ -283,6 +340,7 @@ router.get('/position', (c) => {
                     <input id="fen" type="text" name="fen" class="form-control" placeholder="Enter FEN string" required>
                     <button type="submit" class="btn btn-primary">Submit</button>
                     <button type="button" onclick="generateFEN()" class="btn btn-secondary">Get FEN</button>
+                    <a type="button" onclick="setTimeout(resetBoard, 750)" class="btn btn-warning">Reset</a>
                 </div>
             </form>
         </div>
@@ -293,65 +351,8 @@ router.get('/position', (c) => {
             </div>
         </div>
     </div>
-      ${playableBoard(fen)}`
-    const page = new Page({
-        page_title: 'Home',
-        body: body || `<div class='p-3 text-center'><h2>Hello World!</h2<</div><br>
-                <img class='p-3 mx-auto d-block rounded' src='https://blaineharper.com/assets/favicon.ico' style='max-width:100%; max-height: 25rem'>`
-    })
-    return rawHtmlResponse(page.render())
-});
-router.get('/position', (c) => {
-    const { fen = 'start' } = c.req.queries()
-    console.log(fen)
-    const body = `<div class="py-5 container">
-        <h2 class="text-center">Forsyth-Edwards Notation (FEN)</h2>
-        <p class="text-center">FEN is a standard notation used to describe chess positions for analysis and recording.</p>
-        <hr>
-        <h5 class="card-title">Queen’s Gambit FEN Explained</h5>
-        <p>The Queen’s Gambit opening starts with:</p>
-        <pre class="bg-glass-dark-5 p-2 border">1. d4 d5 2. c4</pre>
-        <p>This results in the following FEN string:</p>
-        <pre class="bg-glass-dark-5 p-2 border">rnbqkbnr/ppp1pppp/8/3p4/2P5/8/PP1PPPPP/RNBQKBNR w KQkq - 0 2</pre>
-        
-        <h6>Breaking it down:</h6>
-        <ul>
-            <li><strong>rnbqkbnr/ppp1pppp/8/3p4/2P5/8/PP1PPPPP/RNBQKBNR</strong> - Board position.</li>
-            <li><strong>w</strong> - White to move.</li>
-            <li><strong>KQkq</strong> - Both sides still have castling rights.</li>
-            <li><strong>-</strong> - No en passant target square.</li>
-            <li><strong>0</strong> - No halfmoves since the last capture or pawn move.</li>
-            <li><strong>2</strong> - It’s White’s second move.</li>
-        </ul>
-        <div class="row">
-            <form method="get" action="" class="mb-4">
-                <div class="input-group">
-                    <input type="text" name="fen" class="form-control" placeholder="Enter FEN string" required>
-                    <button type="submit" class="btn btn-primary">Submit</button>
-                </div>
-            </form>
-        </div>
-        <hr>
-        <div class="g-4 row">
-            <div class="mx-auto col-lg-6 col-md-11">
-                <div id="board" style="touch-action:none;" class="m-0 p-0"></div>
-            </div>
-        </div>
-    </div>
-      <script>
-        var board, game = new Chess();
-        $(document).ready(function() {
-            board = Chessboard('board', {
-                position: '${fen}',
-                pieceTheme: 'https://bhar2254.github.io/src/img/chesspieces/chess.com/cat/{piece}.png'
-            });
-        });
-      </script>`
-    const page = new Page({
-        page_title: 'Home',
-        body: body || `<div class='p-3 text-center'><h2>Hello World!</h2<</div><br>
-                <img class='p-3 mx-auto d-block rounded' src='https://blaineharper.com/assets/favicon.ico' style='max-width:100%; max-height: 25rem'>`
-    })
+    ${playableBoard({start: fen})}`
+    const page = new Page({pageTitle: 'Home',body})
     return rawHtmlResponse(page.render())
 });
 
